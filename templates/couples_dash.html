@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Couples Therapy Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            color: #333;
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            font-size: 20px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        .chat-box {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .chat-message.user {
+            justify-content: flex-end;
+        }
+        .chat-message .bubble {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .chat-message.user .bubble {
+            background-color: #d1e7ff;
+            color: #000;
+            text-align: right;
+        }
+        .chat-message.assistant .bubble {
+            background-color: #e9ecef;
+            color: #000;
+        }
+        .message-input {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .message-input input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .message-input button {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .message-input button:hover {
+            background-color: #0056b3;
+        }
+        .logout {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .logout a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .logout a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome, {{ current_user.username }}</h1>
+        
+        <!-- Private Chat Section -->
+        <div class="section">
+            <h2>Your Private Chat</h2>
+            <div class="chat-box" id="private-chat">
+                {% for message in private_chat %}
+                <div class="chat-message {{ message.role }}">
+                    <div class="bubble">{{ message.content }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <form class="message-input" id="private-chat-form" onsubmit="sendMessage(event, 'private')">
+                <input type="text" id="private-input" placeholder="Enter your message" required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+        
+        <!-- Mediator Chat Section -->
+        <div class="section">
+            <h2>Mediator Session</h2>
+            <div class="chat-box" id="mediator-chat">
+                {% for message in mediator_chat %}
+                <div class="chat-message {{ message.role }}">
+                    <div class="bubble">{{ message.content }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <form class="message-input" id="mediator-chat-form" onsubmit="sendMessage(event, 'mediator')">
+                <input type="text" id="mediator-input" placeholder="Message for mediator" required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+        
+        <!-- Upload History Section -->
+        <div class="section">
+            <h2>Upload Previous Conversations</h2>
+            <form method="POST" action="/upload-history" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".json" required>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+        
+        <!-- Logout -->
+        <div class="logout">
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <script>
+        function sendMessage(event, chatType) {
+            event.preventDefault();
+            const inputField = document.querySelector(`#${chatType}-input`);
+            const message = inputField.value;
+
+            // Validate input
+            if (!message.trim()) {
+                alert("Message cannot be empty!");
+                return;
+            }
+
+            // Indicate loading
+            const chatBox = document.querySelector(`#${chatType}-chat`);
+            const loadingMessage = `<div class="chat-message assistant"><div class="bubble">Sending...</div></div>`;
+            chatBox.innerHTML += loadingMessage;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            fetch(`/dashboard`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, chat_type: chatType })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove the "Sending..." message
+                chatBox.lastChild.remove();
+
+                if (data.error) {
+                    // Display the error in the chat box
+                    const errorMessage = `<div class="chat-message assistant"><div class="bubble error">${data.error}</div></div>`;
+                    chatBox.innerHTML += errorMessage;
+                } else {
+                    // Add the assistant's reply to the chat box
+                    const newMessage = `<div class="chat-message assistant"><div class="bubble">${data.content}</div></div>`;
+                    chatBox.innerHTML += newMessage;
+                    inputField.value = ""; // Clear input field on success
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(error => {
+                chatBox.lastChild.remove(); // Remove "Sending..." message
+                const errorMessage = `<div class="chat-message assistant"><div class="bubble error">Failed to send message. Please try again later.</div></div>`;
+                chatBox.innerHTML += errorMessage;
+                console.error("Error:", error);
+            });
+        }
+    </script>
+</body>
+</html>
+
+@app.route("/dashboard", methods=["GET", "POST"])
+@login_required
+def dashboard():
+    if request.method == "POST":
+        user_input = request.form["message"]
+
+        # Retrieve conversation history for context
+        conversation_history = GPTData.query.filter_by(user_id=current_user.id).order_by(GPTData.id.desc()).limit(10).all()
+        context = [
+            {"role": "user", "content": convo.input_text} if convo.input_text else
+            {"role": "assistant", "content": convo.gpt_response}
+            for convo in reversed(conversation_history)
+        ]
+        context.append({"role": "user", "content": user_input})
+
+        # Call OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a couples counselor inspired by teachings like Abraham Hicks. Provide constructive and compassionate guidance."}
+            ] + context
+        )
+        gpt_response = response['choices'][0]['message']['content']
+
+        # Save conversation to database
+        gpt_data = GPTData(user_id=current_user.id, input_text=user_input, gpt_response=gpt_response)
+        db.session.add(gpt_data)
+        db.session.commit()
+
+        # Retrieve updated conversation history
+        private_chat = [{"role": "user", "content": convo.input_text} if convo.input_text else
+                        {"role": "assistant", "content": convo.gpt_response}
+                        for convo in GPTData.query.filter_by(user_id=current_user.id).order_by(GPTData.id.desc()).all()]
+
+        mediator_chat = []  # Populate this with relevant mediator chat messages if available
+
+        return render_template("couples_dash.html", gpt_response=gpt_response, private_chat=private_chat, mediator_chat=mediator_chat)
+
+    # Retrieve conversation history for GET request
+    private_chat = [{"role": "user", "content": convo.input_text} if convo.input_text else
+                    {"role": "assistant", "content": convo.gpt_response}
+                    for convo in GPTData.query.filter_by(user_id=current_user.id).order_by(GPTData.id.desc()).all()]
+
+    mediator_chat = []  # Populate this with relevant mediator chat messages if available
+
+    return render_template("couples_dash.html", private_chat=private_chat, mediator_chat=mediator_chat)
